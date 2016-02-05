@@ -1,0 +1,27 @@
+{
+  "name": "sealand-bot",
+  "version": "0.0.0",
+  "private": true,
+  "author": "Joshua Karjala-Svendsen <joshua@founders.as>",
+  "description": "Super Awesome Code Bot Yeah",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FoundersAS/sealand-bot.git"
+  },
+  "dependencies": {
+    "docker-registry-client": "^3.0.1",
+    "encrypt-env": "^0.2.5",
+    "envfile": "^1.0.0",
+    "github": "^0.2.4",
+    "js-yaml": "^3.5.2",
+    "mkdirp": "^0.5.1",
+    "rancher-cli": "^0.1.1"
+  },
+  "engines": {
+    "node": "5.5.x"
+  },
+  "bugs": {
+    "url": "https://github.com/FoundersAS/sealand-bot/issues"
+  },
+  "homepage": "https://github.com/FoundersAS/sealand-bot#readme"
+}
