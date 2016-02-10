@@ -1,27 +1,29 @@
 {
-  "name": "sealand-bot",
-  "version": "0.0.0",
-  "private": true,
-  "author": "Joshua Karjala-Svendsen <joshua@founders.as>",
-  "description": "Super Awesome Code Bot Yeah",
+  "name": "hubot-sealand",
+  "version": "0.1.11",
+  "private": false,
+  "author": "Joshua Karjala-Svendsen <joshua@fluxuries.com>",
+  "description": "Allow you to do Rancher deploys from your favourite chat CLI",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/FoundersAS/sealand-bot.git"
+    "url": "git+https://github.com/FoundersAS/hubot-sealand.git"
   },
   "dependencies": {
     "docker-registry-client": "^3.0.1",
     "encrypt-env": "^0.2.5",
-    "envfile": "^1.0.0",
+    "envfile": "^2.0.1",
     "github": "^0.2.4",
     "js-yaml": "^3.5.2",
     "mkdirp": "^0.5.1",
-    "rancher-cli": "^0.1.1"
+    "rancher-cli-async": "0.1.7",
+    "request": "^2.69.0",
+    "rimraf": "^2.5.2"
   },
   "engines": {
     "node": "5.5.x"
   },
   "bugs": {
-    "url": "https://github.com/FoundersAS/sealand-bot/issues"
+    "url": "https://github.com/FoundersAS/hubot-sealand/issues"
   },
-  "homepage": "https://github.com/FoundersAS/sealand-bot#readme"
+  "homepage": "https://github.com/FoundersAS/hubot-sealand#readme"
 }
