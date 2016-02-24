@@ -20,7 +20,7 @@
 //   DOCKER_HUB_USERNAME - username for Docker Hub
 //   DOCKER_HUB_PASSWORD - password for Docker Hub
 //   GITHUB_API_TOKEN - API token that can read from your private repos
-//   AES_KEY - The AES key to decrypt your environemnt files
+//   AES_KEY - The AES key to decrypt your environment files
 //   DOCKER_COMPOSE_FILE - The docker compose file that we look for in your repo
 //   ADMIN_USERNAME - The chat user who is admin
 //   DEV_ROOM_UD - The id of the room to post messages to when receinv github webooks
@@ -47,6 +47,7 @@ function hubotSealand (robot) {
       secretKey: process.env.RANCHER_SECRET_KEY
     }
   }, {
+    RANCHER_LOADBALANCER_ID: process.env.RANCHER_LOADBALANCER_ID,
     AES_KEY: process.env.AES_KEY,
     GITHUB_API_TOKEN: process.env.GITHUB_API_TOKEN,
     DOCKER_COMPOSE_FILE: process.env.DOCKER_COMPOSE_FILE || 'docker-compose.yml',
