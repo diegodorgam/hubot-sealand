@@ -125,7 +125,7 @@ module.exports = function (rancherOptions, extras) {
         return true;
       }).map(item => doc[item].env_file + '.enc'))];
 
-      const getFile = github.getFile(repoCreds, commitHash);
+      const getFile = github.getFileMany(repoCreds, commitHash);
       each(envFiles, getFile, ongetencryptedenv);
     };
 
@@ -157,7 +157,6 @@ module.exports = function (rancherOptions, extras) {
 
   that.deployCommit = function (repoCreds, commitHash, cb) {
     var composeFilePath = utils.getComposeFilePath(repoCreds, DOCKER_COMPOSE_FILE);
-
     downloadComposeFile(repoCreds, commitHash, function (err) {
       if (err) return cb(err);
 
