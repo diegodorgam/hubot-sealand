@@ -2,6 +2,7 @@ var RancherClient = require('rancher-cli-async/dist/rancher');
 var yaml = require('js-yaml');
 var rimraf = require('rimraf');
 var request = require('request');
+var each = require('async-each');
 var encryptEnv = require('encrypt-env');
 var envfile = require('envfile');
 var mkdirp = require('mkdirp');
@@ -80,18 +81,35 @@ module.exports = function (rancherOptions, extras) {
       return cb();
     };
 
-    var ongetencryptedenv = function (err, encryptedEnv) {
+    var ongetencryptedenv = function (err, result) {
       if (err) return cb(err);
 
       var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
 
-      var decryptedEnv = encryptEnv('KEY', {'KEY': AES_KEY}).decryptEnv(false, encryptedEnv);
-      var envJson = envfile.parseSync(decryptedEnv);
+      const envs = Object.keys(result).map(function (item) {
+        const decryptedEnv = encryptEnv('KEY', {'KEY': AES_KEY}).decryptEnv(false, result[item].encryptedEnv);
+        result[item].decryptedEnv = envfile.parseSync(decryptedEnv);
+        return result[item];
+      }).reduce(function (prevItem, item) {
+        prevItem[item.path] = item;
+        return prevItem;
+      }, {});
 
-      doc.web.environment = envJson;
-      doc.web.image += ':' + commitHash;
-
-      delete doc.web['env_file'];
+      doc = Object.keys(doc).map(function (service) {
+        doc[service].service = service;
+        if (doc[service].hasOwnProperty('labels') && doc[service].labels['codebot.dont_rewrite']) {
+          return doc[service];
+        }
+        doc[service].environment = envs[doc[service].env_file + '.enc'].decryptedEnv;
+        doc[service].image += ':' + commitHash;
+        delete doc[service]['env_file'];
+        return doc[service];
+      }).reduce(function (prevItem, item) {
+        const service = item.service;
+        delete item.service;
+        prevItem[service] = item;
+        return prevItem;
+      }, {});
 
       fs.writeFile(composeFilePath, yaml.safeDump(doc), onwritecomposefilewithenv);
     };
@@ -100,18 +118,28 @@ module.exports = function (rancherOptions, extras) {
       if (err) return cb(err);
 
       var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
-      var encryptedEnvPath = doc.web.env_file + '.enc';
+      var envFiles = [...new Set(Object.keys(doc).filter(function (item) {
+        if (doc[item].hasOwnProperty('labels')) {
+          return !doc[item].labels['codebot.dont_rewrite'];
+        }
+        return true;
+      }).map(item => doc[item].env_file + '.enc'))];
 
-      github.getFile(repoCreds, commitHash, encryptedEnvPath, ongetencryptedenv);
+      const getFile = github.getFile(repoCreds, commitHash);
+      each(envFiles, getFile, ongetencryptedenv);
     };
 
     var onwritecomposefile = function (err) {
       if (err) return cb(err);
 
       var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
-      var dockerRepo = doc.web.image;
-
-      docker.checkHubForImage(dockerRepo, commitHash, oncheckdocker);
+      var services = Object.keys(doc).filter(function (item) {
+        if (doc[item].hasOwnProperty('labels')) {
+          return !doc[item].labels['codebot.dont_rewrite'];
+        }
+        return true;
+      }).map(item => doc[item].image);
+      each(services, docker.checkHubForImage(commitHash), oncheckdocker);
     };
 
     var ongetcomposefile = function (err, composeFile) {

@@ -1,6 +1,6 @@
 {
   "name": "hubot-sealand",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": false,
   "author": "Joshua Karjala-Svendsen <joshua@fluxuries.com>",
   "description": "Allow you to do Rancher deploys from your favourite chat CLI",
@@ -9,6 +9,7 @@
     "url": "git+https://github.com/FoundersAS/hubot-sealand.git"
   },
   "dependencies": {
+    "async-each": "^1.0.0",
     "docker-registry-client": "^3.0.1",
     "encrypt-env": "^0.2.5",
     "envfile": "^2.0.1",
