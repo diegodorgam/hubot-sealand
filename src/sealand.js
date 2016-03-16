@@ -2,7 +2,8 @@
 //   Allow you to do Rancher deploys from your favourite chat CLI
 //
 // Dependencies:
-//   docker-registry-client": "^3.0.1"
+//   "async-each": "^1.0.0"
+//   "docker-registry-client": "^3.0.1"
 //   "encrypt-env": "^0.2.5"
 //   "envfile": "^2.0.1"
 //   "github": "^0.2.4"
@@ -114,6 +115,20 @@ function hubotSealand (robot) {
     robot.messageRoom(SLACK_ROOM_ID, 'Loadbalancer Status:\n\n' + entries.join('\n'));
 
     return res.send('OK');
+  });
+
+  robot.router.post('/up', function (req, res) {
+    robot.logger.info('Up webhook:\n\n' + JSON.stringify(req.body));
+    var githubRepo = req.body.repo;
+    var commitHash = req.body.commitHash;
+
+    var repoCreds = utils.generateRepoCreds(githubRepo);
+
+    rancher.deployCommit(repoCreds, commitHash, function (err) {
+      if (err) return res.send(JSON.stringify(err));
+      robot.messageRoom(SLACK_ROOM_ID, 'Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
+      return res.send('OK');
+    });
   });
 
   robot.respond(/up (.*) (.*)/i, function (res) {
