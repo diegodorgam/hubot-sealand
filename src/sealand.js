@@ -125,7 +125,7 @@ function hubotSealand (robot) {
     var repoCreds = utils.generateRepoCreds(githubRepo);
 
     rancher.deployCommit(repoCreds, commitHash, function (err) {
-      if (err) return res.send(JSON.stringify(err));
+      if (err) return res.status(500).send(JSON.stringify(err));
       robot.messageRoom(SLACK_ROOM_ID, 'Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
       return res.send('OK');
     });
