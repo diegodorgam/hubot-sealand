@@ -27,7 +27,8 @@ module.exports = function (rancherOptions, extras) {
     password: extras.DOCKER_HUB_PASSWORD
   });
 
-  var getStackName = function (repoCreds, commitHash) {
+  var getStackName = function (repoCreds, commitHash, branch) {
+    if (branch) return repoCreds.repo + '-' + branch;
     return repoCreds.repo + '-' + commitHash;
   };
 
@@ -97,17 +98,20 @@ module.exports = function (rancherOptions, extras) {
 
       doc = Object.keys(doc).map(function (service) {
         doc[service].service = service;
-        if (doc[service].hasOwnProperty('labels') && doc[service].labels['codebot.dont_rewrite']) {
+        if (doc[service].hasOwnProperty('labels') && doc[service].labels['sealand.rewrite']) {
+          doc[service].environment = envs[doc[service].env_file + '.enc'].decryptedEnv;
+          doc[service].image += ':' + commitHash;
+          delete doc[service]['env_file'];
+
           return doc[service];
         }
-        doc[service].environment = envs[doc[service].env_file + '.enc'].decryptedEnv;
-        doc[service].image += ':' + commitHash;
-        delete doc[service]['env_file'];
+
         return doc[service];
       }).reduce(function (prevItem, item) {
         const service = item.service;
         delete item.service;
         prevItem[service] = item;
+
         return prevItem;
       }, {});
 
@@ -118,12 +122,8 @@ module.exports = function (rancherOptions, extras) {
       if (err) return cb(err);
 
       var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
-      var envFiles = [...new Set(Object.keys(doc).filter(function (item) {
-        if (doc[item].hasOwnProperty('labels')) {
-          return !doc[item].labels['codebot.dont_rewrite'];
-        }
-        return true;
-      }).map(item => doc[item].env_file + '.enc'))];
+      var envFiles = [...new Set(Object.keys(doc)
+        .map(item => doc[item].env_file + '.enc'))];
 
       const getFile = github.getFileMany(repoCreds, commitHash);
       each(envFiles, getFile, ongetencryptedenv);
@@ -135,9 +135,9 @@ module.exports = function (rancherOptions, extras) {
       var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
       var services = Object.keys(doc).filter(function (item) {
         if (doc[item].hasOwnProperty('labels')) {
-          return !doc[item].labels['codebot.dont_rewrite'];
+          return doc[item].labels['sealand.rewrite'];
         }
-        return true;
+        return false;
       }).map(item => doc[item].image);
       each(services, docker.checkHubForImage(commitHash), oncheckdocker);
     };
@@ -155,13 +155,13 @@ module.exports = function (rancherOptions, extras) {
     github.getFile(repoCreds, commitHash, DOCKER_COMPOSE_FILE, ongetcomposefile);
   };
 
-  that.deployCommit = function (repoCreds, commitHash, cb) {
-    var composeFilePath = utils.getComposeFilePath(repoCreds, DOCKER_COMPOSE_FILE);
-    downloadComposeFile(repoCreds, commitHash, function (err) {
+  that.deployCommit = function (options, cb) {
+    var composeFilePath = utils.getComposeFilePath(options.repoCreds, DOCKER_COMPOSE_FILE);
+    downloadComposeFile(options.repoCreds, options.commitHash, function (err) {
       if (err) return cb(err);
 
       rancher.up({
-        stack: getStackName(repoCreds, commitHash),
+        stack: getStackName(options.repoCreds, options.commitHash, options.branch),
         dockerComposeFile: composeFilePath
       }, function (err) {
         if (err) return cb(err);
@@ -170,30 +170,30 @@ module.exports = function (rancherOptions, extras) {
     });
   };
 
-  that.killCommit = function (repoCreds, commitHash, cb) {
-    var composeFilePath = utils.getComposeFilePath(repoCreds, DOCKER_COMPOSE_FILE);
+  that.killCommit = function (options, cb) {
+    var composeFilePath = utils.getComposeFilePath(options.repoCreds, DOCKER_COMPOSE_FILE);
 
     var ondownloadcomposefile = function (err) {
       if (err) return cb(err);
 
-      rancher.exec('-f ' + composeFilePath + ' -p ' + repoCreds.repo + '-' + commitHash + ' rm --force', function (err) {
+      rancher.exec('-f ' + composeFilePath + ' -p ' + options.repoCreds.repo + '-' + options.commitHash + ' rm --force', function (err) {
         if (err) return cb(err);
 
-        rimraf(utils.getTmpDir(repoCreds), function (err) {
+        rimraf(utils.getTmpDir(options.repoCreds), function (err) {
           if (err) return cb(err);
           cb();
-          that.deleteStack(repoCreds, commitHash, function (result) {
+          that.deleteStack(options, function (result) {
             return console.log(JSON.stringify(result));
           });
         });
       });
     };
 
-    downloadComposeFile(repoCreds, commitHash, ondownloadcomposefile);
+    downloadComposeFile(options.repoCreds, options.commitHash, ondownloadcomposefile);
   };
 
-  that.deleteStack = function (repoCreds, commitHash, cb) {
-    var stackName = getStackName(repoCreds, commitHash);
+  that.deleteStack = function (options, cb) {
+    var stackName = getStackName(options.repoCreds, options.commitHash);
 
     var ondeletestack = function (err, result) {
       if (err) return cb(err);

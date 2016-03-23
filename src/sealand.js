@@ -122,9 +122,15 @@ function hubotSealand (robot) {
     var githubRepo = req.body.repo;
     var commitHash = req.body.commitHash;
 
+    var branch = req.body.branch || false;
+
     var repoCreds = utils.generateRepoCreds(githubRepo);
 
-    rancher.deployCommit(repoCreds, commitHash, function (err) {
+    rancher.deployCommit({
+      repoCreds: repoCreds,
+      commitHash: commitHash,
+      branch: branch
+    }, function (err) {
       if (err) {
         console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);
         return res.status(500).send(JSON.stringify(err));
@@ -140,7 +146,10 @@ function hubotSealand (robot) {
 
     var repoCreds = utils.generateRepoCreds(githubRepo);
 
-    rancher.deployCommit(repoCreds, commitHash, function (err) {
+    rancher.deployCommit({
+      repoCreds: repoCreds,
+      commitHash: commitHash
+    }, function (err) {
       if (err) {
         console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);
         return res.send(JSON.stringify(err));
@@ -155,7 +164,10 @@ function hubotSealand (robot) {
 
     var repoCreds = utils.generateRepoCreds(githubRepo);
 
-    rancher.killCommit(repoCreds, commitHash, function (err) {
+    rancher.killCommit({
+      repoCreds: repoCreds,
+      commitHash: commitHash
+    }, function (err) {
       if (err) {
         console.log('Error killing commit - ', githubRepo, commitHash, '\n', err);
         return res.send(JSON.stringify(err));
