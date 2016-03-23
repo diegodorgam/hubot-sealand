@@ -96,26 +96,17 @@ module.exports = function (rancherOptions, extras) {
         return prevItem;
       }, {});
 
-      doc = Object.keys(doc).map(function (service) {
-        doc[service].service = service;
+      Object.keys(doc).forEach(function (service) {
         if (doc[service].hasOwnProperty('labels') && doc[service].labels['sealand.rewrite']) {
-          doc[service].environment = envs[doc[service].env_file + '.enc'].decryptedEnv;
+          if (doc[service].env_file) {
+            doc[service].environment = envs[doc[service].env_file + '.enc'].decryptedEnv;
+            delete doc[service]['env_file'];
+          }
           doc[service].image += ':' + commitHash;
-          delete doc[service]['env_file'];
-
-          return doc[service];
         }
+      });
 
-        return doc[service];
-      }).reduce(function (prevItem, item) {
-        const service = item.service;
-        delete item.service;
-        prevItem[service] = item;
-
-        return prevItem;
-      }, {});
-
-      fs.writeFile(composeFilePath, yaml.safeDump(doc), onwritecomposefilewithenv);
+      fs.writeFile(composeFilePath, yaml.safeDump(doc, {noRefs: true}), onwritecomposefilewithenv);
     };
 
     var oncheckdocker = function (err) {
@@ -123,6 +114,7 @@ module.exports = function (rancherOptions, extras) {
 
       var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
       var envFiles = [...new Set(Object.keys(doc)
+        .filter(item => doc[item].env_file !== undefined)
         .map(item => doc[item].env_file + '.enc'))];
 
       const getFile = github.getFileMany(repoCreds, commitHash);
@@ -160,10 +152,7 @@ module.exports = function (rancherOptions, extras) {
     downloadComposeFile(options.repoCreds, options.commitHash, function (err) {
       if (err) return cb(err);
 
-      rancher.up({
-        stack: getStackName(options.repoCreds, options.commitHash, options.branch),
-        dockerComposeFile: composeFilePath
-      }, function (err) {
+      rancher.exec('-f ' + composeFilePath + ' -p ' + getStackName(options.repoCreds, options.commitHash, options.branch) + ' up -d --upgrade -c', function (err) {
         if (err) return cb(err);
         cb();
       });
@@ -176,7 +165,7 @@ module.exports = function (rancherOptions, extras) {
     var ondownloadcomposefile = function (err) {
       if (err) return cb(err);
 
-      rancher.exec('-f ' + composeFilePath + ' -p ' + options.repoCreds.repo + '-' + options.commitHash + ' rm --force', function (err) {
+      rancher.exec('-f ' + composeFilePath + ' -p ' + getStackName(options.repoCreds, options.commitHash) + ' rm --force', function (err) {
         if (err) return cb(err);
 
         rimraf(utils.getTmpDir(options.repoCreds), function (err) {
