@@ -125,7 +125,10 @@ function hubotSealand (robot) {
     var repoCreds = utils.generateRepoCreds(githubRepo);
 
     rancher.deployCommit(repoCreds, commitHash, function (err) {
-      if (err) return res.status(500).send(JSON.stringify(err));
+      if (err) {
+        console.log('Error deploying commit:', err);
+        return res.status(500).send(JSON.stringify(err));
+      }
       robot.messageRoom(SLACK_ROOM_ID, 'Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
       return res.send('OK');
     });
@@ -138,7 +141,10 @@ function hubotSealand (robot) {
     var repoCreds = utils.generateRepoCreds(githubRepo);
 
     rancher.deployCommit(repoCreds, commitHash, function (err) {
-      if (err) return res.send(JSON.stringify(err));
+      if (err) {
+        console.log('Error deploying commit:', err);
+        return res.send(JSON.stringify(err));
+      }
       res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
     });
   });
@@ -150,7 +156,10 @@ function hubotSealand (robot) {
     var repoCreds = utils.generateRepoCreds(githubRepo);
 
     rancher.killCommit(repoCreds, commitHash, function (err) {
-      if (err) return res.send(JSON.stringify(err));
+      if (err) {
+        console.log('Error killing commit:', err);
+        return res.send(JSON.stringify(err));
+      }
       res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been removed from Rancher');
     });
   });
