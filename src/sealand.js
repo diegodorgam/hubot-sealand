@@ -126,7 +126,7 @@ function hubotSealand (robot) {
 
     rancher.deployCommit(repoCreds, commitHash, function (err) {
       if (err) {
-        console.log('Error deploying commit:', err);
+        console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);
         return res.status(500).send(JSON.stringify(err));
       }
       robot.messageRoom(SLACK_ROOM_ID, 'Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
@@ -142,7 +142,7 @@ function hubotSealand (robot) {
 
     rancher.deployCommit(repoCreds, commitHash, function (err) {
       if (err) {
-        console.log('Error deploying commit:', err);
+        console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);
         return res.send(JSON.stringify(err));
       }
       res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
@@ -157,7 +157,7 @@ function hubotSealand (robot) {
 
     rancher.killCommit(repoCreds, commitHash, function (err) {
       if (err) {
-        console.log('Error killing commit:', err);
+        console.log('Error killing commit - ', githubRepo, commitHash, '\n', err);
         return res.send(JSON.stringify(err));
       }
       res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been removed from Rancher');
