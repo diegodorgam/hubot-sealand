@@ -121,6 +121,7 @@ function hubotSealand (robot) {
     robot.logger.info('Up webhook:\n\n' + JSON.stringify(req.body));
     var githubRepo = req.body.repo;
     var commitHash = req.body.commitHash;
+    var composeFile = req.body.composeFile;
 
     var branch = req.body.branch || false;
 
@@ -129,7 +130,8 @@ function hubotSealand (robot) {
     rancher.deployCommit({
       repoCreds: repoCreds,
       commitHash: commitHash,
-      branch: branch
+      branch: branch,
+      composeFile: composeFile
     }, function (err) {
       if (err) {
         console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);

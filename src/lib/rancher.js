@@ -76,9 +76,7 @@ module.exports = function (rancherOptions, extras) {
     });
   };
 
-  var downloadComposeFile = function (repoCreds, commitHash, cb) {
-    var composeFilePath = utils.getComposeFilePath(repoCreds, DOCKER_COMPOSE_FILE);
-
+  var downloadComposeFile = function (opts, cb) {
     var onwritecomposefilewithenv = function (err) {
       if (err) return cb(err);
       return cb();
@@ -87,7 +85,7 @@ module.exports = function (rancherOptions, extras) {
     var ongetencryptedenv = function (err, result) {
       if (err) return cb(err);
 
-      var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
+      var doc = yaml.safeLoad(fs.readFileSync(opts.composeFilePath, 'utf8'));
 
       const envs = Object.keys(result).map(function (item) {
         const decryptedEnv = encryptEnv('KEY', {'KEY': AES_KEY}).decryptEnv(false, result[item].encryptedEnv);
@@ -104,54 +102,55 @@ module.exports = function (rancherOptions, extras) {
             doc[service].environment = envs[doc[service].env_file + '.enc'].decryptedEnv;
             delete doc[service]['env_file'];
           }
-          doc[service].image += ':' + commitHash;
+          doc[service].image += ':' + opts.commitHash;
         }
       });
 
-      fs.writeFile(composeFilePath, yaml.safeDump(doc, {noRefs: true}), onwritecomposefilewithenv);
+      fs.writeFile(opts.composeFilePath, yaml.safeDump(doc, {noRefs: true}), onwritecomposefilewithenv);
     };
 
     var oncheckdocker = function (err) {
       if (err) return cb(err);
 
-      var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
+      var doc = yaml.safeLoad(fs.readFileSync(opts.composeFilePath, 'utf8'));
       var envFiles = [...new Set(Object.keys(doc)
         .filter(item => doc[item].env_file !== undefined)
         .map(item => doc[item].env_file + '.enc'))];
 
-      const getFile = github.getFileMany(repoCreds, commitHash);
+      const getFile = github.getFileMany(opts.repoCreds, opts.commitHash);
       each(envFiles, getFile, ongetencryptedenv);
     };
 
     var onwritecomposefile = function (err) {
       if (err) return cb(err);
 
-      var doc = yaml.safeLoad(fs.readFileSync(composeFilePath, 'utf8'));
+      var doc = yaml.safeLoad(fs.readFileSync(opts.composeFilePath, 'utf8'));
       var services = Object.keys(doc).filter(function (item) {
         if (doc[item].hasOwnProperty('labels')) {
           return doc[item].labels['sealand.rewrite'];
         }
         return false;
       }).map(item => doc[item].image);
-      each(services, docker.checkHubForImage(commitHash), oncheckdocker);
+      each(services, docker.checkHubForImage(opts.commitHash), oncheckdocker);
     };
 
     var ongetcomposefile = function (err, composeFile) {
       if (err) return cb(err);
 
-      mkdirp(utils.getTmpDir(repoCreds), function (err) {
+      mkdirp(utils.getTmpDir(opts.repoCreds), function (err) {
         if (err) return cb(err);
 
-        fs.writeFile(composeFilePath, composeFile, onwritecomposefile);
+        fs.writeFile(opts.composeFilePath, composeFile, onwritecomposefile);
       });
     };
 
-    github.getFile(repoCreds, commitHash, DOCKER_COMPOSE_FILE, ongetcomposefile);
+    github.getFile(opts.repoCreds, opts.commitHash, opts.composeFile, ongetcomposefile);
   };
 
   that.deployCommit = function (options, cb) {
-    var composeFilePath = utils.getComposeFilePath(options.repoCreds, DOCKER_COMPOSE_FILE);
-    downloadComposeFile(options.repoCreds, options.commitHash, function (err) {
+    var composeFile = options.composeFile || DOCKER_COMPOSE_FILE;
+    var composeFilePath = utils.getComposeFilePath(options.repoCreds, composeFile);
+    downloadComposeFile(Object.assign(options, { composeFilePath, composeFile }), function (err) {
       if (err) return cb(err);
 
       rancher.exec('-f ' + composeFilePath + ' -p ' + getStackName(options.repoCreds, options.commitHash, options.branch) + ' up -d --upgrade -c', function (err) {
@@ -180,7 +179,7 @@ module.exports = function (rancherOptions, extras) {
       });
     };
 
-    downloadComposeFile(options.repoCreds, options.commitHash, ondownloadcomposefile);
+    downloadComposeFile(Object.assign(options, { composeFilePath }), ondownloadcomposefile);
   };
 
   that.deleteStack = function (options, cb) {
