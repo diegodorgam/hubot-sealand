@@ -7,6 +7,7 @@ var encryptEnv = require('encrypt-env');
 var envfile = require('envfile');
 var mkdirp = require('mkdirp');
 var fs = require('fs');
+var path = require('path');
 
 var utils = require('./utils');
 
@@ -32,8 +33,9 @@ module.exports = function (rancherOptions, extras) {
     return repoCreds.repo + '-' + commitHash;
   };
 
-  var rancherGetRequest = function (path, cb) {
-    request('http://rancher.foundersapps.com/v1/projects/' + RANCHER_PROJECT_ID + path, {
+  var rancherGetRequest = function (stub, cb) {
+    request({
+      url: path.join(rancherOptions.address, '/v1/projects/', RANCHER_PROJECT_ID, stub),
       auth: {
         user: rancherOptions.auth.accessKey,
         pass: rancherOptions.auth.secretKey
@@ -51,9 +53,9 @@ module.exports = function (rancherOptions, extras) {
     });
   };
 
-  var rancherPostRequest = function (path, payload, cb) {
+  var rancherPostRequest = function (stub, payload, cb) {
     request({
-      url: 'http://rancher.foundersapps.com/v1/projects/' + RANCHER_PROJECT_ID + path,
+      url: path.join(rancherOptions.address, '/v1/projects/', RANCHER_PROJECT_ID, stub),
       auth: {
         user: rancherOptions.auth.accessKey,
         pass: rancherOptions.auth.secretKey
