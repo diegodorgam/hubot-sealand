@@ -30,7 +30,8 @@ A configuration should look like this:
             "auth": {
                 "accessKey": "xxxx",
                 "secretKey": "xxxx"
-            }
+            },
+            "lbId": "xxxx"
         },
         "aesKey": "xxxx"
     }

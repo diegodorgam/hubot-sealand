@@ -1,3 +1,4 @@
+'use strict';
 // Description:
 //   Allow you to do Rancher deploys from your favourite chat CLI
 //
@@ -21,13 +22,12 @@
 //   DOCKER_HUB_USERNAME - username for Docker Hub
 //   DOCKER_HUB_PASSWORD - password for Docker Hub
 //   GITHUB_API_TOKEN - API token that can read from your private repos
-//   AES_KEY - The AES key to decrypt your environment files
-//   DOCKER_COMPOSE_FILE - The docker compose file that we look for in your repo
+//   DOCKER_COMPOSE_FILE - The default docker compose file that we look for in your repo
 //   ADMIN_USERNAME - The chat user who is admin
-//   DEV_ROOM_UD - The id of the room to post messages to when receinv github webooks
+//   DEV_ROOM_ID - The id of the room to post messages to when receinv github webooks
 //
 // Commands:
-//   hubot up <githubRepo> <commitHash> - Deploy this commit
+//   hubot up <githubRepo> <commitHash> <environmentKey> - Deploy this commit
 //   hubot down <githubRepo> <commitHash> - Bring this commit down
 //   hubot status - View loadbalancer status
 //   hubot addUser <username> - Add user to whitelist (admin only)
@@ -45,7 +45,6 @@ function hubotSealand (robot) {
     RANCHER_LOADBALANCER_ID: process.env.RANCHER_LOADBALANCER_ID,
     AES_KEY: process.env.AES_KEY,
     GITHUB_API_TOKEN: process.env.GITHUB_API_TOKEN,
-    DOCKER_COMPOSE_FILE: process.env.DOCKER_COMPOSE_FILE || 'docker-compose.yml',
     DOCKER_HUB_USERNAME: process.env.DOCKER_HUB_USERNAME,
     DOCKER_HUB_PASSWORD: process.env.DOCKER_HUB_PASSWORD
   });
@@ -54,6 +53,7 @@ function hubotSealand (robot) {
 
   var ADMIN_USERNAME = process.env.ADMIN_USERNAME;
   var SLACK_ROOM_ID = process.env.SLACK_ROOM_ID;
+  var DOCKER_COMPOSE_FILE = process.env.DOCKER_COMPOSE_FILE || 'docker-compose.staging.yml';
 
   // Only whitelisted users can issue commands
 
@@ -66,7 +66,7 @@ function hubotSealand (robot) {
     context.response.message.finish();
 
     if (context.response.message.text.match(robot.respondPattern(''))) {
-      context.response.reply('You do not have access to this command - contact @' + ADMIN_USERNAME);
+      context.response.reply(`You do not have access to this command - contact @${ADMIN_USERNAME}`);
     }
 
     return done();
@@ -115,7 +115,7 @@ function hubotSealand (robot) {
     robot.logger.info(`Webhook /up: ${JSON.stringify(req.body)}`);
     var githubRepo = req.body.repo;
     var commitHash = req.body.commitHash;
-    var composeFile = req.body.composeFile || process.env.DOCKER_COMPOSE_FILE;
+    var composeFile = req.body.composeFile || DOCKER_COMPOSE_FILE;
     var branch = req.body.branch || false;
 
     var repoCreds = utils.generateRepoCreds(githubRepo);
@@ -141,47 +141,61 @@ function hubotSealand (robot) {
     });
   });
 
-  // robot.respond(/up (.*) (.*)/i, function (res) {
-  //   var githubRepo = res.match[1];
-  //   var commitHash = res.match[2];
+  robot.respond(/up (.*) (.*) (.*)/i, function (res) {
+    var githubRepo = res.match[1];
+    var commitHash = res.match[2];
+    var environment = res.match[3];
 
-  //   var repoCreds = utils.generateRepoCreds(githubRepo);
+    var repoCreds = utils.generateRepoCreds(githubRepo);
+    getEnv(environment, function (err, environment) {
+      if (err) throw err;
 
-  //   rancher.deployCommit({
-  //     repoCreds: repoCreds,
-  //     commitHash: commitHash
-  //   }, function (err) {
-  //     if (err) {
-  //       console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);
-  //       return res.send(JSON.stringify(err));
-  //     }
-  //     res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
-  //   });
-  // });
+      rancher.deployCommit({
+        repoCreds: repoCreds,
+        commitHash: commitHash,
+        composeFile: DOCKER_COMPOSE_FILE,
+        environment: environment,
+        branch: false
+      }, function (err) {
+        if (err) {
+          console.log(`Error deploying commit - ${githubRepo} ${commitHash}\n`, err);
+          return res.send(JSON.stringify(err));
+        }
+        res.send(`Repo: ${repoCreds.repo} Commit: ${commitHash} has been pushed to Rancher`);
+      });
+    });
+  });
 
-  // robot.respond(/down (.*) (.*)/i, function (res) {
-  //   var githubRepo = res.match[1];
-  //   var commitHash = res.match[2];
+  robot.respond(/down (.*) (.*)/i, function (res) {
+    var githubRepo = res.match[1];
+    var commitHash = res.match[2];
 
-  //   var repoCreds = utils.generateRepoCreds(githubRepo);
+    var repoCreds = utils.generateRepoCreds(githubRepo);
 
-  //   rancher.killCommit({
-  //     repoCreds: repoCreds,
-  //     commitHash: commitHash
-  //   }, function (err) {
-  //     if (err) {
-  //       console.log('Error killing commit - ', githubRepo, commitHash, '\n', err);
-  //       return res.send(JSON.stringify(err));
-  //     }
-  //     res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been removed from Rancher');
-  //   });
-  // });
+    getEnv('staging.json', function (err, environment) {
+      if (err) throw err;
+
+      rancher.killCommit({
+        repoCreds: repoCreds,
+        commitHash: commitHash,
+        environment: environment,
+        composeFile: DOCKER_COMPOSE_FILE,
+        branch: false
+      }, function (err) {
+        if (err) {
+          console.error(`Error killing commit - ${githubRepo} ${commitHash}\n`, err);
+          return res.send(JSON.stringify(err));
+        }
+        res.send(`Repo: ${repoCreds.repo} Commit: ${commitHash} has been removed from Rancher`);
+      });
+    });
+  });
 
   robot.respond(/addUser (.*)/i, function (res) {
     var username = res.match[1];
 
     addToWhitelist(username);
-    res.send(username + ' is added to the whitelist');
+    res.send(`${username} is added to the whitelist`);
   });
 
   robot.respond(/deleteUser (.*)/i, function (res) {
@@ -189,18 +203,22 @@ function hubotSealand (robot) {
 
     deleteFromWhitelist(username);
 
-    res.send(username + ' is deleted from the whitelist');
+    res.send(`${username} is deleted from the whitelist`);
   });
 
   robot.respond(/whitelist/i, function (res) {
     var whitelist = getWhitelist();
-    res.send('Current whitelist: ' + Object.keys(whitelist).join(', '));
+    res.send(`Current whitelist: ${Object.keys(whitelist).join(', ')}`);
   });
 
   robot.respond(/status/i, function (res) {
-    rancher.getLoadbalancerStatus(function (err, entries) {
-      if (err) return res.send(JSON.stringify(err));
-      res.send('Loadbalancer Status:\n\n' + entries.join('\n'));
+    getEnv('staging.json', function (err, environment) {
+      if (err) throw err;
+
+      rancher.getLoadbalancerStatus(function (err, entries) {
+        if (err) return res.send(JSON.stringify(err));
+        res.send(`Loadbalancer Status: ${entries.join('\n')}`);
+      });
     });
   });
 

@@ -14,10 +14,6 @@ var utils = require('./utils');
 module.exports = function (extras) {
   var that = {};
 
-  var DOCKER_COMPOSE_FILE = extras.DOCKER_COMPOSE_FILE;
-  var RANCHER_PROJECT_ID = 'foo';  // rancherOptions.projectId;
-  var RANCHER_LOADBALANCER_ID = extras.RANCHER_LOADBALANCER_ID;
-
   var github = require('./github')(extras.GITHUB_API_TOKEN);
 
   var docker = require('./docker')({
@@ -26,16 +22,16 @@ module.exports = function (extras) {
   });
 
   var getStackName = function (repoCreds, commitHash, branch) {
-    if (branch) return repoCreds.repo + '-' + branch;
-    return repoCreds.repo + '-' + commitHash;
+    if (branch) return `${repoCreds.repo}-${branch}`;
+    return `${repoCreds.repo}-${commitHash}`;
   };
 
-  var rancherGetRequest = function (config, stub, cb) {
+  var rancherGetRequest = function (environment, stub, cb) {
     request({
-      url: path.join(rancherOptions.address, '/v1/projects/', RANCHER_PROJECT_ID, stub),
+      url: path.join(environment.rancher.address, '/v1/projects/', environment.rancher.projectId, stub),
       auth: {
-        user: rancherOptions.auth.accessKey,
-        pass: rancherOptions.auth.secretKey
+        user: environment.rancher.auth.accessKey,
+        pass: environment.rancher.auth.secretKey
       },
       headers: {
         'content-type': 'application/json'
@@ -50,12 +46,12 @@ module.exports = function (extras) {
     });
   };
 
-  var rancherPostRequest = function (stub, payload, cb) {
+  var rancherPostRequest = function (environment, stub, payload, cb) {
     request({
-      url: path.join(rancherOptions.address, '/v1/projects/', RANCHER_PROJECT_ID, stub),
+      url: path.join(environment.rancher.address, '/v1/projects/', environment.rancher.projectId, stub),
       auth: {
-        user: rancherOptions.auth.accessKey,
-        pass: rancherOptions.auth.secretKey
+        user: environment.rancher.auth.accessKey,
+        pass: environment.rancher.auth.secretKey
       },
       method: 'POST',
       json: true,
@@ -147,7 +143,8 @@ module.exports = function (extras) {
     downloadComposeFile(options, function (err) {
       if (err) return cb(err);
 
-      rancher.exec('-f ' + options.composeFilePath + ' -p ' + getStackName(options.repoCreds, options.commitHash, options.branch) + ' up -d --upgrade -c', function (err) {
+      var stackName = getStackName(options.repoCreds, options.commitHash, options.branch);
+      rancher.exec(`-f ${options.composeFilePath} -p ${stackName} up -d --upgrade -c`, function (err) {
         if (err) return cb(err);
         cb();
       });
@@ -156,12 +153,13 @@ module.exports = function (extras) {
 
   that.killCommit = function (options, cb) {
     var rancher = new RancherClient(options.environment.rancher);
-    var composeFilePath = utils.getComposeFilePath(options.repoCreds, DOCKER_COMPOSE_FILE);
+    var composeFilePath = utils.getComposeFilePath(options.repoCreds, options.composeFile);
 
     var ondownloadcomposefile = function (err) {
       if (err) return cb(err);
 
-      rancher.exec('-f ' + composeFilePath + ' -p ' + getStackName(options.repoCreds, options.commitHash) + ' rm --force', function (err) {
+      var stackName = getStackName(options.repoCreds, options.commitHash, options.branch);
+      rancher.exec(`-f ${composeFilePath} -p ${stackName} rm --force`, function (err) {
         if (err) return cb(err);
 
         rimraf(utils.getTmpDir(options.repoCreds), function (err) {
@@ -187,18 +185,18 @@ module.exports = function (extras) {
 
     var onsearchstacks = function (err, stacks) {
       if (err) return cb(err);
-      if (stacks.data && stacks.data.length < 1) return cb({errror: 'No stacks found matching: ' + stackName});
+      if (stacks.data && stacks.data.length < 1) return cb({errror: `No stacks found matching: ${stackName}`});
 
       var stack = stacks.data.pop();
 
-      rancherPostRequest('/environments/' + stack.id + '/?action=remove', {}, ondeletestack);
+      rancherPostRequest(options.environment, `/environments/${stack.id}/?action=remove`, {}, ondeletestack);
     };
 
-    rancherGetRequest('/environment?name=' + stackName, onsearchstacks);
+    rancherGetRequest(options.environment, `/environment?name=${stackName}`, onsearchstacks);
   };
 
-  that.getLoadbalancerStatus = function (cb) {
-    rancherGetRequest('/serviceconsumemaps?serviceId=' + RANCHER_LOADBALANCER_ID, function (err, serviceConsumeMaps) {
+  that.getLoadbalancerStatus = function (options, cb) {
+    rancherGetRequest(options.environment, `/serviceconsumemaps?serviceId=${options.environment.lbId}`, function (err, serviceConsumeMaps) {
       if (err) return cb(err);
 
       var mappings = serviceConsumeMaps.data.map(function (s) {
