@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "async-each": "^1.0.0",
+    "aws-sdk": "^2.3.3",
     "docker-registry-client": "^3.0.1",
     "encrypt-env": "^0.2.5",
     "envfile": "^2.0.1",

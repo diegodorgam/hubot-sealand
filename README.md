@@ -15,3 +15,22 @@ Extension for your hubot which integrates with Rancher, Github and Docker Hub.
       "branch": "master",
       "composeFile": "docker-compose.yml"
     }'
+
+# Configurations
+
+We expect `process.env.CONFIG_BUCKET` to be the name of a bucket in s3.
+
+A configuration should look like this:
+
+    $ cat dev.json
+    {
+        "rancher": {
+            "address": "xxxx",
+            "projectId": "xxxx",
+            "auth": {
+                "accessKey": "xxxx",
+                "secretKey": "xxxx"
+            }
+        },
+        "aesKey": "xxxx"
+    }

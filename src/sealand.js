@@ -38,16 +38,10 @@
 //   joshuakarjala <joshua@fluxuries.com>
 
 function hubotSealand (robot) {
+  var getEnv = require('./lib/config');
   var utils = require('./lib/utils');
 
   var rancher = require('./lib/rancher')({
-    address: process.env.RANCHER_URL,
-    projectId: process.env.RANCHER_PROJECT_ID,
-    auth: {
-      accessKey: process.env.RANCHER_ACCESS_KEY,
-      secretKey: process.env.RANCHER_SECRET_KEY
-    }
-  }, {
     RANCHER_LOADBALANCER_ID: process.env.RANCHER_LOADBALANCER_ID,
     AES_KEY: process.env.AES_KEY,
     GITHUB_API_TOKEN: process.env.GITHUB_API_TOKEN,
@@ -118,65 +112,70 @@ function hubotSealand (robot) {
   });
 
   robot.router.post('/up', function (req, res) {
-    robot.logger.info('Up webhook:\n\n' + JSON.stringify(req.body));
+    robot.logger.info(`Webhook /up: ${JSON.stringify(req.body)}`);
     var githubRepo = req.body.repo;
     var commitHash = req.body.commitHash;
-    var composeFile = req.body.composeFile;
-
+    var composeFile = req.body.composeFile || process.env.DOCKER_COMPOSE_FILE;
     var branch = req.body.branch || false;
 
     var repoCreds = utils.generateRepoCreds(githubRepo);
 
-    rancher.deployCommit({
-      repoCreds: repoCreds,
-      commitHash: commitHash,
-      branch: branch,
-      composeFile: composeFile
-    }, function (err) {
-      if (err) {
-        console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);
-        return res.status(500).send(JSON.stringify(err));
-      }
-      robot.messageRoom(SLACK_ROOM_ID, 'Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
-      return res.send('OK');
+    getEnv(req.body.environment, function (err, environment) {
+      if (err) throw err;
+
+      rancher.deployCommit({
+        repoCreds: repoCreds,
+        commitHash: commitHash,
+        branch: branch,
+        composeFile: composeFile,
+        environment: environment
+      }, function (err) {
+        if (err) {
+          console.error(`Error deploying commit - ${githubRepo} ${commitHash}\n`, err);
+          res.status(500).send(JSON.stringify(err));
+          throw err;
+        }
+        robot.messageRoom(SLACK_ROOM_ID, `Repo: ${repoCreds.repo} Commit: ${commitHash} has been pushed to Rancher`);
+        res.send('OK');
+      });
     });
   });
 
-  robot.respond(/up (.*) (.*)/i, function (res) {
-    var githubRepo = res.match[1];
-    var commitHash = res.match[2];
+  // robot.respond(/up (.*) (.*)/i, function (res) {
+  //   var githubRepo = res.match[1];
+  //   var commitHash = res.match[2];
 
-    var repoCreds = utils.generateRepoCreds(githubRepo);
+  //   var repoCreds = utils.generateRepoCreds(githubRepo);
 
-    rancher.deployCommit({
-      repoCreds: repoCreds,
-      commitHash: commitHash
-    }, function (err) {
-      if (err) {
-        console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);
-        return res.send(JSON.stringify(err));
-      }
-      res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
-    });
-  });
+  //   rancher.deployCommit({
+  //     repoCreds: repoCreds,
+  //     commitHash: commitHash
+  //   }, function (err) {
+  //     if (err) {
+  //       console.log('Error deploying commit - ', githubRepo, commitHash, '\n', err);
+  //       return res.send(JSON.stringify(err));
+  //     }
+  //     res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been pushed to Rancher');
+  //   });
+  // });
 
-  robot.respond(/down (.*) (.*)/i, function (res) {
-    var githubRepo = res.match[1];
-    var commitHash = res.match[2];
+  // robot.respond(/down (.*) (.*)/i, function (res) {
+  //   var githubRepo = res.match[1];
+  //   var commitHash = res.match[2];
 
-    var repoCreds = utils.generateRepoCreds(githubRepo);
+  //   var repoCreds = utils.generateRepoCreds(githubRepo);
 
-    rancher.killCommit({
-      repoCreds: repoCreds,
-      commitHash: commitHash
-    }, function (err) {
-      if (err) {
-        console.log('Error killing commit - ', githubRepo, commitHash, '\n', err);
-        return res.send(JSON.stringify(err));
-      }
-      res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been removed from Rancher');
-    });
-  });
+  //   rancher.killCommit({
+  //     repoCreds: repoCreds,
+  //     commitHash: commitHash
+  //   }, function (err) {
+  //     if (err) {
+  //       console.log('Error killing commit - ', githubRepo, commitHash, '\n', err);
+  //       return res.send(JSON.stringify(err));
+  //     }
+  //     res.send('Repo: ' + repoCreds.repo + ' Commit: ' + commitHash + ' has been removed from Rancher');
+  //   });
+  // });
 
   robot.respond(/addUser (.*)/i, function (res) {
     var username = res.match[1];
